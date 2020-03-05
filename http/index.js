@@ -155,6 +155,9 @@ class HttpClient {
  * @param {number=} opt_retries The current number of retries.
  */
 function sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries) {
+  var date = new Date();
+  console.log('[SELENIUM-WEBDRIVER]  sendRequest on hostname: ' + options.hostname + ' ; path: ' + options.path + ' timestamp: ' + Date.now() + " datetime " + date.toUTCString());
+
   var hostname = options.hostname;
   var port = options.port;
 
@@ -209,11 +212,14 @@ function sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries) {
       }
 
       if (!location.hostname) {
+        console.log("/!\\ Location not exist ! " + location.hostname);
         location.hostname = hostname;
         location.port = port;
       }
 
       request.abort();
+
+      console.log("[SELENIUM-WEBDRIVER] A request has been aborted. Retry on " + location.hostname);
       sendRequest(
         {
           method: "GET",

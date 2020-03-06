@@ -20,13 +20,14 @@
  * communicates with a remote end using HTTP + JSON.
  */
 
-"use strict";
+'use strict';
 
-const http = require("http");
-const https = require("https");
-const url = require("url");
+const http = require('http');
+const https = require('https');
+const url = require('url');
 
-const httpLib = require("../lib/http");
+const httpLib = require('../lib/http');
+
 
 /**
  * @typedef {{protocol: (?string|undefined),
@@ -39,6 +40,7 @@ const httpLib = require("../lib/http");
  */
 var RequestOptions;
 
+
 /**
  * @param {string} aUrl The request URL to parse.
  * @return {RequestOptions} The request options.
@@ -47,7 +49,7 @@ var RequestOptions;
 function getRequestOptions(aUrl) {
   let options = url.parse(aUrl);
   if (!options.hostname) {
-    throw new Error("Invalid URL: " + aUrl);
+    throw new Error('Invalid URL: ' + aUrl);
   }
   // Delete the search and has portions as they are not used.
   options.search = null;
@@ -56,13 +58,15 @@ function getRequestOptions(aUrl) {
   return options;
 }
 
+
 /** @const {string} */
 const USER_AGENT = (function() {
-  const version = require("../package.json").version;
+  const version = require('../package.json').version;
   const platform =
-    { darwin: "mac", win32: "windows" }[process.platform] || "linux";
+      ({'darwin': 'mac', 'win32': 'windows'}[process.platform]) || 'linux';
   return `selenium/${version} (js ${platform})`;
 })();
+
 
 /**
  * A basic HTTP client used to send messages to a remote end.
@@ -105,16 +109,16 @@ class HttpClient {
       });
     }
 
-    headers["User-Agent"] = USER_AGENT;
-    headers["Content-Length"] = 0;
-    if (httpRequest.method == "POST" || httpRequest.method == "PUT") {
+    headers['User-Agent'] = USER_AGENT;
+    headers['Content-Length'] = 0;
+    if (httpRequest.method == 'POST' || httpRequest.method == 'PUT') {
       data = JSON.stringify(httpRequest.data);
-      headers["Content-Length"] = Buffer.byteLength(data, "utf8");
-      headers["Content-Type"] = "application/json;charset=UTF-8";
+      headers['Content-Length'] = Buffer.byteLength(data, 'utf8');
+      headers['Content-Type'] = 'application/json;charset=UTF-8';
     }
 
     let path = this.options_.path;
-    if (path.endsWith("/") && httpRequest.path.startsWith("/")) {
+    if (path.endsWith('/') && httpRequest.path.startsWith('/')) {
       path += httpRequest.path.substring(1);
     } else {
       path += httpRequest.path;
@@ -135,7 +139,7 @@ class HttpClient {
       search: parsedPath.search,
       hash: parsedPath.hash,
 
-      headers
+      headers,
     };
 
     return new Promise((fulfill, reject) => {
@@ -143,6 +147,7 @@ class HttpClient {
     });
   }
 }
+
 
 /**
  * Sends a single HTTP request.
@@ -155,14 +160,12 @@ class HttpClient {
  * @param {number=} opt_retries The current number of retries.
  */
 function sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries) {
-  var date = new Date();
-  console.log('[SELENIUM-WEBDRIVER]  sendRequest on hostname: ' + options.hostname + ' ; path: ' + options.path + ' timestamp: ' + Date.now() + " datetime " + date.toUTCString());
 
   var hostname = options.hostname;
   var port = options.port;
 
   if (opt_proxy) {
-    let proxy = /** @type {RequestOptions} */ (opt_proxy);
+    let proxy = /** @type {RequestOptions} */(opt_proxy);
 
     // RFC 2616, section 5.1.2:
     // The absoluteURI form is REQUIRED when the request is being made to a
@@ -175,90 +178,76 @@ function sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries) {
     // being requested by the proxy.
     let targetHost = options.hostname;
     if (options.port) {
-      targetHost += ":" + options.port;
+      targetHost += ':' + options.port;
     }
 
-    // Use the proxy protocol
-    options.protocol = opt_proxy.protocol;
-
     // Update the request options with our proxy info.
-    options.headers["Host"] = targetHost;
+    options.headers['Host'] = targetHost;
     options.path = absoluteUri;
     options.host = proxy.host;
     options.hostname = proxy.hostname;
     options.port = proxy.port;
 
+    // Update the protocol to avoid EPROTO errors when the webdriver proxy
+    // uses a different protocol from the remote selenium server.
+    options.protocol = opt_proxy.protocol;
+
     if (proxy.auth) {
-      options.headers["Proxy-Authorization"] =
-        "Basic " + new Buffer(proxy.auth).toString("base64");
+      options.headers['Proxy-Authorization'] =
+          'Basic ' + new Buffer(proxy.auth).toString('base64');
     }
   }
 
-  let requestFn = options.protocol === "https:" ? https.request : http.request;
+  let requestFn = options.protocol === 'https:' ? https.request : http.request;
   var request = requestFn(options, function onResponse(response) {
     if (response.statusCode == 302 || response.statusCode == 303) {
       try {
-        var location = url.parse(response.headers["location"]);
+        var location = url.parse(response.headers['location']);
       } catch (ex) {
-        onError(
-          Error(
+        onError(Error(
             'Failed to parse "Location" header for server redirect: ' +
-              ex.message +
-              "\nResponse was: \n" +
-              new httpLib.Response(response.statusCode, response.headers, "")
-          )
-        );
+            ex.message + '\nResponse was: \n' +
+            new httpLib.Response(response.statusCode, response.headers, '')));
         return;
       }
 
       if (!location.hostname) {
-        console.log("/!\\ Location not exist ! " + location.hostname);
         location.hostname = hostname;
         location.port = port;
       }
 
       request.abort();
-
-      console.log("[SELENIUM-WEBDRIVER] A request has been aborted. Retry on " + location.hostname);
-      sendRequest(
-        {
-          method: "GET",
-          protocol: location.protocol || options.protocol,
-          hostname: location.hostname,
-          port: location.port,
-          path: location.path,
-          pathname: location.pathname,
-          search: location.search,
-          hash: location.hash,
-          headers: {
-            Accept: "application/json; charset=utf-8",
-            "User-Agent": USER_AGENT
-          }
-        },
-        onOk,
-        onError,
-        undefined,
-        opt_proxy
-      );
+      sendRequest({
+        method: 'GET',
+        protocol: location.protocol || options.protocol,
+        hostname: location.hostname,
+        port: location.port,
+        path: location.path,
+        pathname: location.pathname,
+        search: location.search,
+        hash: location.hash,
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'User-Agent': USER_AGENT,
+        }
+      }, onOk, onError, undefined, opt_proxy);
       return;
     }
 
     var body = [];
-    response.on("data", body.push.bind(body));
-    response.on("end", function() {
+    response.on('data', body.push.bind(body));
+    response.on('end', function() {
       var resp = new httpLib.Response(
-        /** @type {number} */ (response.statusCode),
-        /** @type {!Object<string>} */ (response.headers),
-        Buffer.concat(body)
-          .toString("utf8")
-          .replace(/\0/g, "")
-      );
+          /** @type {number} */(response.statusCode),
+          /** @type {!Object<string>} */(response.headers),
+          Buffer.concat(body).toString('utf8').replace(/\0/g, ''));
       onOk(resp);
     });
   });
 
-  request.on("error", function(e) {
-    if (typeof opt_retries === "undefined") {
+  request.on('error', function(e) {
+
+    if (typeof opt_retries === 'undefined') {
       opt_retries = 0;
     }
 
@@ -266,11 +255,11 @@ function sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries) {
       opt_retries += 1;
       setTimeout(function() {
         sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries);
-      }, 15);
+      }, 100);
     } else {
       var message = e.message;
       if (e.code) {
-        message = e.code + " " + message;
+        message = e.code + ' ' + message;
       }
       onError(new Error(message));
     }
@@ -282,6 +271,7 @@ function sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries) {
 
   request.end();
 }
+
 
 const MAX_RETRIES = 3;
 
@@ -303,18 +293,18 @@ function shouldRetryRequest(retries, err) {
  * @return {boolean}
  */
 function isRetryableNetworkError(err) {
+
   if (err && err.code) {
-    return (
-      err.code === "ECONNABORTED" ||
-      err.code === "ECONNRESET" ||
-      err.code === "ECONNREFUSED" ||
-      err.code === "EADDRINUSE" ||
-      err.code === "EPIPE"
-    );
+    return err.code === 'ECONNABORTED' ||
+          err.code === 'ECONNRESET' ||
+          err.code === 'ECONNREFUSED' ||
+          err.code === 'EADDRINUSE' ||
+          err.code === 'EPIPE';
   }
 
   return false;
 }
+
 
 // PUBLIC API
 

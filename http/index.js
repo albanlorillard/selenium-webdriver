@@ -160,6 +160,8 @@ class HttpClient {
  * @param {number=} opt_retries The current number of retries.
  */
 function sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries) {
+  var date = new Date();
+  console.log('[SELENIUM-WEBDRIVER-#1]  sendRequest on hostname: ' + options.hostname + ' ; path: ' + options.path + ' timestamp: ' + Date.now() + " datetime " + date.toUTCString());
 
   var hostname = options.hostname;
   var port = options.port;
@@ -246,16 +248,18 @@ function sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries) {
   });
 
   request.on('error', function(e) {
+    console.log('[SELENIUM-WEBDRIVER-#2] error detected ');
 
     if (typeof opt_retries === 'undefined') {
       opt_retries = 0;
     }
 
     if (shouldRetryRequest(opt_retries, e)) {
+      console.log('[SELENIUM-WEBDRIVER-#3] Retry request ');
       opt_retries += 1;
       setTimeout(function() {
         sendRequest(options, onOk, onError, opt_data, opt_proxy, opt_retries);
-      }, 100);
+      }, 15);
     } else {
       var message = e.message;
       if (e.code) {
@@ -293,6 +297,9 @@ function shouldRetryRequest(retries, err) {
  * @return {boolean}
  */
 function isRetryableNetworkError(err) {
+  var date = new Date();
+  console.log('[SELENIUM-WEBDRIVER-#4] network error ' + err.code);
+  console.dir(err);
 
   if (err && err.code) {
     return err.code === 'ECONNABORTED' ||
